@@ -107,7 +107,7 @@ class TiltifyClient {
    */
   async generateKey (attempt = 1) {
     // console.log("Gen Key", Boolean(this.refreshToken), new Date(Date.now()));
-    console.log("Authenticating Tiltify");
+    console.debug("Authenticating Tiltify");
     const tail = this.refreshToken ? `grant_type=refresh_token&refresh_token=${this.refreshToken}` : "grant_type=client_credentials&scope=public webhooks:write"
     const url = `https://v5api.tiltify.com/oauth/token?client_id=${this.#clientID}&client_secret=${this.#clientSecret}&${tail}`
     const options = {
@@ -183,35 +183,28 @@ class TiltifyClient {
    * @param {function} callback A function to call when we're done processing.
    */
   async _sendRequest (path, callback) {
-
-    let results = []
-    let keepGoing = true
-    while (keepGoing) {
-      try {
+    try {
+      let results = []
+      let keepGoing = true
+      while (keepGoing) {
         const response = (await this.parent._doRequest(path)).data
-        if (
-          response.data !== undefined &&
-          response.data !== null &&
-          response.metadata !== undefined &&
-          response.metadata.after !== undefined &&
-          response.metadata.after !== null
-        ) {
-          const url = 'https://temp.com/' + path // Combine the base URL and path
-          const urlObj = new URL(url) // Create a URL object
-          urlObj.searchParams.set('after', response.metadata.after) // Set the 'after' query parameter
-          const updatedPath = urlObj.pathname.replace('/', '') + urlObj.search // Get the updated path with query parameters. Remove first /
-          path = updatedPath
-        } else {
-          keepGoing = false
-        }
+        if (response.data) {
           results = results.concat(response.data)
-          if (response.data == null || response.data.length === 0 || response.metadata?.after == null) {
-            keepGoing = false
-            callback(results)
+  
+          if (response.metadata && response.metadata.after) {
+            const url = 'https://temp.com/' + path // Combine the base URL and path
+            const urlObj = new URL(url) // Create a URL object
+            urlObj.searchParams.set('after', response.metadata.after) // Set the 'after' query parameter
+            const updatedPath = urlObj.pathname.replace('/', '') + urlObj.search // Get the updated path with query parameters. Remove first /
+            path = updatedPath
+            continue
           }
-      } catch (e) {
-        this.parent.errorParse(e, `Error sending request to ${path}`);
+        }
+      keepGoing = false
+      callback(results)
       }
+    } catch (e) {
+      this.parent.errorParse(e, `Error sending request to ${path}`);
     }
   }
 
